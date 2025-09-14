@@ -6,12 +6,10 @@ import { isOwner } from '../lib/isOwner'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 export default function Services() {
-  // ข้อมูลสำหรับหน้า public
   const [data, setData] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
-  // โหมดแก้ไข (เปิดได้เมื่อกลับมาด้วย ?edit=1 และเป็นเจ้าของร้าน)
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Partial<Service>>({})
   const [busy, setBusy] = useState(false)
@@ -22,12 +20,20 @@ export default function Services() {
   const navigate = useNavigate()
   const [search] = useSearchParams()
 
-  // เปิดโหมดแก้ไขอัตโนมัติ ถ้าเป็น owner และมี ?edit=1 ติด URL
+  // ✅ Debug log ช่วยตรวจสอบค่าจริง (ลบออกได้หลัง deploy)
   useEffect(() => {
-    if (owner && search.get('edit') === '1') setEditMode(true)
+    console.log('🔎 owner:', owner)
+    console.log('🔎 edit param:', search.get('edit'))
   }, [owner, search])
 
-  // โหลดข้อมูลครั้งแรก
+  // ✅ เปิดโหมดแก้ไขเมื่อเป็นเจ้าของ + มี ?edit=1
+  useEffect(() => {
+    if (owner && search.get('edit') === '1') {
+      setEditMode(true)
+    }
+  }, [owner, search])
+
+  // โหลดข้อมูลเริ่มต้น
   useEffect(() => {
     (async () => {
       try {
@@ -40,7 +46,7 @@ export default function Services() {
     })()
   }, [])
 
-  // Realtime: refetch เมื่อมี insert/update/delete
+  // ✅ เปิด realtime: refetch เมื่อมีเปลี่ยนแปลงในตาราง
   useEffect(() => {
     const ch = supabase
       .channel('services-rt')
@@ -56,13 +62,18 @@ export default function Services() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  // ปุ่ม Edit → ไปหน้า Login เสมอ (เพื่อให้ยืนยันอีเมล/รหัสก่อน)
+  // ✅ ปุ่ม Edit → ไปหน้า Login พร้อม redirect และ edit=1
   const onClickEdit = () => {
-    navigate('/login?redirect=/services&edit=1')
+    const safeRedirect = encodeURIComponent('/services?edit=1')
+    navigate(`/login?redirect=${safeRedirect}`)
   }
-  const onExitEdit = () => { setEditMode(false); setForm({}) }
 
-  // ===== CRUD: ทำงานได้เฉพาะเมื่อ owner && editMode =====
+  const onExitEdit = () => {
+    setEditMode(false)
+    setForm({})
+  }
+
+  // ✅ CRUD ทำงานเฉพาะ owner + editMode เท่านั้น
   const upsert = async () => {
     if (!(owner && editMode)) return
     setBusy(true); setErr(null)
@@ -72,14 +83,11 @@ export default function Services() {
       price: Number(form.price),
       duration_min: Number(form.duration_min),
       description: form.description ?? null,
-      // ❌ เอา is_active ออก (ให้โชว์เสมอ / ใช้ default ใน DB)
-      // is_active: true,
     }
     const { error } = await supabase.from('services').upsert(payload)
     setBusy(false)
     if (error) setErr(error.message)
     setForm({})
-    // ไม่ต้อง setData — realtime จะรีเฟรชให้
   }
 
   const editRow = (s: Service) => {
@@ -93,7 +101,6 @@ export default function Services() {
     const { error } = await supabase.from('services').delete().eq('id', id)
     if (error) setErr(error.message)
   }
-  // ==============================================
 
   // ---------- styles ----------
   const field: CSSProperties = {
@@ -113,7 +120,6 @@ export default function Services() {
     margin: '12px auto',
     padding: 32
   }
-  // ----------------------------
 
   if (loading) return <div style={{ padding: 24 }}>กำลังโหลดบริการ…</div>
   if (err) return <div style={{ padding: 24, color: 'crimson' }}>เกิดข้อผิดพลาด: {err}</div>
@@ -130,7 +136,7 @@ export default function Services() {
         textShadow: '0 2px 8px rgba(0,0,0,0.7)',
       }}
     >
-      {/* แถบบน: ปุ่ม Edit → ไปหน้า Login เสมอ */}
+      {/* ปุ่มจัดการ/ออก */}
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         {!editMode ? (
           <button onClick={onClickEdit}>จัดการร้าน</button>
@@ -140,9 +146,9 @@ export default function Services() {
       </div>
 
       <div style={card}>
-        <h1>โหมดแก้ไขบริการสำหรับเจ้าของร้าน</h1>
+        <h1>บริการของร้าน</h1>
 
-        {/* ฟอร์มเพิ่ม/แก้ไข: แสดงเฉพาะเมื่อเป็นเจ้าของร้าน + editMode เปิดอยู่ */}
+        {/* ✅ แบบฟอร์มแก้ไข/เพิ่ม - แสดงเฉพาะ owner + editMode */}
         {owner && editMode && (
           <div
             style={{
@@ -182,7 +188,6 @@ export default function Services() {
                 value={form.description ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
-              {/* ❌ ลบช่องติ๊ก is_active ออก */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button onClick={upsert} disabled={busy}>
                   {form.id ? 'บันทึกการแก้ไข' : 'เพิ่มบริการ'}
@@ -218,7 +223,6 @@ export default function Services() {
               <p>ระยะเวลา: {s.duration_min} นาที</p>
               <p>ราคา: {s.price} บาท</p>
               {s.description && <p>{s.description}</p>}
-              {/* ❌ ไม่ต้องแสดงป้ายสถานะซ่อนแล้ว */}
             </div>
           ))}
           {data.length === 0 && <div>ยังไม่มีบริการ</div>}

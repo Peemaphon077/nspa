@@ -1,4 +1,3 @@
-// src/pages/Login.tsx
 import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -12,8 +11,10 @@ export default function Login() {
   const navigate = useNavigate()
   const [search] = useSearchParams()
 
-  const redirect = search.get('redirect') || '/'
-  const wantEdit = search.get('edit') === '1'
+  // ✅ redirect ถูก encode มาจาก Services.tsx
+  const redirect = search.get('redirect')
+    ? decodeURIComponent(search.get('redirect')!)
+    : '/'
 
   useEffect(() => {
     document.title = 'เข้าสู่ระบบ | Long Doo Spa'
@@ -21,21 +22,21 @@ export default function Login() {
 
   const signIn = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setErr(null); setLoading(true)
+    setErr(null)
+    setLoading(true)
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) return setErr(error.message)
 
-    const backUrl = wantEdit
-      ? `${redirect}${redirect.includes('?') ? '&' : '?'}edit=1`
-      : redirect
-    navigate(backUrl, { replace: true })
+    // ✅ กลับไป path ที่ส่งมา
+    navigate(redirect, { replace: true })
   }
 
   // ================== Styles ==================
   const palette = {
-    baseCream: 'rgba(241,236,223,0.92)',  // ฟิล์มครีมโปร่งทับรูป
-    overlay: 'rgba(70,66,60,0.62)',       // การ์ดเทาอมน้ำตาลโปร่ง
+    baseCream: 'rgba(241,236,223,0.92)',
+    overlay: 'rgba(70,66,60,0.62)',
     overlayBorder: 'rgba(255,255,255,0.10)',
     textOnOverlay: 'rgba(255,255,255,0.92)',
     heading: '#ffffff',
@@ -47,12 +48,11 @@ export default function Login() {
     display: 'grid',
     placeItems: 'center',
     padding: 24,
-    // ใช้ภาพที่ให้เป็นพื้นหลัง + ฟิล์มครีมโปร่งเพื่อให้อ่านง่าย
     backgroundImage: 'url("/barber-bg.jpg")',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
-    backgroundColor: '#f1ecdf', // เผื่อรูปไม่โหลด
+    backgroundColor: '#f1ecdf',
   }
 
   const card: React.CSSProperties = {
@@ -104,7 +104,6 @@ export default function Login() {
 
   const inputWrap: React.CSSProperties = { display: 'grid', gap: 6, marginTop: 10 }
 
-  // ใช้ grid สำหรับช่องรหัสผ่าน + ปุ่มแสดง/ซ่อน (กันล้นกรอบ)
   const inputRow: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '1fr auto',
@@ -168,7 +167,7 @@ export default function Login() {
       <form onSubmit={signIn} style={card} aria-label="ฟอร์มเข้าสู่ระบบสำหรับเจ้าของร้าน">
         <h2 style={title}>เข้าสู่ระบบสำหรับเจ้าของร้าน</h2>
         <p style={subtitle}>
-          {wantEdit ? 'ยืนยันตัวตนเพื่อเข้าโหมดแก้ไขบริการ' : 'กรอกอีเมลและรหัสผ่านเพื่อจัดการข้อมูลร้าน'}
+          กรอกอีเมลและรหัสผ่านเพื่อจัดการข้อมูลร้าน
         </p>
 
         {/* Email */}
@@ -219,7 +218,7 @@ export default function Login() {
           disabled={loading}
           style={{ ...primaryBtn, ...(loading ? disabledBtn : {}) }}
         >
-          {loading ? 'กำลังตรวจสอบ…' : (wantEdit ? 'ล็อกอินเพื่อเข้าโหมดแก้ไข' : 'เข้าสู่ระบบ')}
+          {loading ? 'กำลังตรวจสอบ…' : 'เข้าสู่ระบบ'}
         </button>
 
         {err && (
