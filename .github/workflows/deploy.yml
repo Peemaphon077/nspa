@@ -1,0 +1,51 @@
+name: CI/CD (Build & Deploy to Vercel)
+
+on:
+  push:
+    branches: [ "main" ]   # ปรับชื่อสาขาได้ตามที่ใช้จริง
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⤵️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      # สอดคล้องกับ package.json ของคุณ
+      - name: 🧪 Typecheck (tsc -b)
+        run: npx tsc -b
+
+      - name: 🧹 Lint (optional)
+        run: npm run lint || true
+
+      # ตรงกับ script: "build": "tsc -b && vite build"
+      - name: 🏗️ Build (Vite)
+        run: npm run build
+
+      - name: ⬇️ Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      # ดึง binding ของโปรเจกต์จาก Vercel (จะสร้างไฟล์ .vercel/project.json ชั่วคราว)
+      - name: 🔐 Pull Vercel Project Settings
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      # เลือกแนวทาง deploy ได้ 2 แบบ (แนะนำแบบ A เพื่อให้ใช้ผล build ของเรา)
+
+      # A) ใช้ผล build ที่เราสร้างไว้ข้างบน (เร็วขึ้น)
+      - name: 🚀 Deploy to Vercel (use prebuilt)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      # B) ให้ Vercel build เองบนคลาวด์ (ช้ากว่า แต่เรียบง่าย)
+      # - name: 🚀 Deploy to Vercel (let Vercel build)
+      #   run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
